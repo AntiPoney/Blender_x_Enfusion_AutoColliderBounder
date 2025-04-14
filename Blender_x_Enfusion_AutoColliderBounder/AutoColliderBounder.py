@@ -257,6 +257,75 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
                 self.report({'INFO'},
                     f"Created collider '{collider_obj.name}' with usage '{self.collider_usage}'")
         return {'FINISHED'}
+    
+    
+class OBJECT_OT_modify_collider_layer(bpy.types.Operator):
+    
+    """Modify the layer of the selected colliders"""
+    bl_idname = "object.modify_collider_layer"
+    bl_label = "Modify Collider Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    collider_usage: bpy.props.EnumProperty(
+        name="Collider Usage",
+        items=[
+            ("Main", "Main", "Default usage for colliders"),
+            ("Building", "Building", "For static building collisions"),
+            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
+            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
+            ("Bush", "Bush", "For foliage collisions"),
+            ("Cover", "Cover", "For cover collisions"),
+            ("Character", "Character", "For character colliders"),
+            ("CharacterAI", "CharacterAI", "For AI character colliders"),
+            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
+            ("Debris", "Debris", "For debris colliders"),
+            ("Door", "Door", "For door collisions"),
+            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
+            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
+            ("Foliage", "Foliage", "For vegetation collisions"),
+            ("Interaction", "Interaction", "For interactive colliders"),
+            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
+            ("Ladder", "Ladder", "For ladder interactions"),
+            ("Projectile", "Projectile", "For larger projectiles"),
+            ("Prop", "Prop", "For dynamic prop collisions"),
+            ("PropView", "PropView", "For dynamic props with view collision"),
+            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
+            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
+            ("Terrain", "Terrain", "For terrain collisions"),
+            ("Tree", "Tree", "For tree collider collisions"),
+            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
+            ("TreePart", "TreePart", "For tree branch colliders"),
+            ("Vehicle", "Vehicle", "For vehicle colliders"),
+            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
+            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
+            ("Weapon", "Weapon", "For weapon colliders"),
+            ("Wheel", "Wheel", "For vehicle wheel colliders"),
+        ],
+        default='Main',
+    )
+    
+    def invoke(self, context, event):
+        # Pop up a dialog to let the user set the properties.
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def execute(self, context):
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+
+        for obj in selected_objects:
+            if obj.type != 'MESH':
+                continue
+            if "usage" in obj:
+                obj["usage"] = self.collider_usage
+                self.report({'INFO'}, f"Modified collider '{obj.name}' to usage '{self.collider_usage}'")
+            else:
+                self.report({'WARNING'}, f"Object '{obj.name}' is not a collider")
+
+        return {'FINISHED'}
+    
+    
 
 # --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
@@ -269,9 +338,13 @@ class VIEW3D_PT_collider_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("object.create_collider", text="Create Collider")
+        layout.operator("object.modify_collider_layer", text="Modify Collider Layer")
+        
+        
 
 classes = (
     OBJECT_OT_create_collider,
+    OBJECT_OT_modify_collider_layer,
     VIEW3D_PT_collider_panel,
 )
 
