@@ -16,7 +16,7 @@ A Blender add-on for creating / converting mesh objects into clicks ready collid
 
 ## Installation
 
-1. Download this repository as a ZIP file
+1. Download the zip file from the latest release 
 2. Open Blender
 3. Go to `Edit` > `Preferences` > `Add-ons` > `drop-down arrow`
 4. Click `Install...` and select the ZIP file you downloaded
