@@ -29,11 +29,11 @@ A Blender add-on for creating / converting mesh objects into clicks ready collid
 ## Usage
 
 1. Select one or more objects in the 3D Viewport
-2a. press `Create Collider` if you wish to create a new object for the collider 
-2b. for complex collision, I encoure you to create the object yourself,
+2. press `Create Collider` if you wish to create a new object for the collider
+3. for complex collision, I encoure you to create the object yourself,
     when you are ready to bake it, press `Convert To Collider`
-3. Follow the dialog box, in case of doubt, hover the buttons to get a hint information
-4. you're ready to export !
+4. Follow the dialog box, in case of doubt, hover the buttons to get a hint information
+5. you're ready to export !
 
 
 ## Notes
