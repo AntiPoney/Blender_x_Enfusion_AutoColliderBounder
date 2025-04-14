@@ -39,7 +39,7 @@ A Blender add-on for creating / converting mesh objects into clicks ready collid
 ## Notes
 
 - The add-on creates a new object as the collider and does not modify the original mesh (except for converting)
-- Convex Hull and Mesh colliders are based on the original mesh's geometry, so it is CRUCIAL to simplify the mesh beforehand
+- Convex and triangles colliders are based on the original mesh's geometry, so it is CRUCIAL to simplify the mesh beforehand
 
 ## License
 
