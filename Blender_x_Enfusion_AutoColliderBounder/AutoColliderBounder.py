@@ -1,51 +1,91 @@
 import bpy, bmesh, math
 from mathutils import Vector
 
+# --- Allowed Collider Usage values (from Arma Reforger Collision Layers/LayerPresets) ---
+# These values come from the official documentation (see:
+# https://community.bistudio.com/wiki/Arma_Reforger:Collision_Layer and
+# https://community.bistudio.com/wiki/Arma_Reforger:FBX_Import )
+# Format: (identifier, name, description, icon)
+ALLOWED_COLLIDER_USAGES = [
+    ("Main", "Main", "Default usage for colliders"),
+    ("Building", "Building", "For static building collisions"),
+    ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
+    ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
+    ("Bush", "Bush", "For foliage collisions"),
+    ("Cover", "Cover", "For cover collisions"),
+    ("Character", "Character", "For character colliders"),
+    ("CharacterAI", "CharacterAI", "For AI character colliders"),
+    ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
+    ("Debris", "Debris", "For debris colliders"),
+    ("Door", "Door", "For door collisions"),
+    ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
+    ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
+    ("Foliage", "Foliage", "For vegetation collisions"),
+    ("Interaction", "Interaction", "For interactive colliders"),
+    ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
+    ("Ladder", "Ladder", "For ladder interactions"),
+    ("Projectile", "Projectile", "For larger projectiles"),
+    ("Prop", "Prop", "For dynamic prop collisions"),
+    ("PropView", "PropView", "For dynamic props with view collision"),
+    ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
+    ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
+    ("Terrain", "Terrain", "For terrain collisions"),
+    ("Tree", "Tree", "For tree collider collisions"),
+    ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
+    ("TreePart", "TreePart", "For tree branch colliders"),
+    ("Vehicle", "Vehicle", "For vehicle colliders"),
+    ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
+    ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
+    ("Weapon", "Weapon", "For weapon colliders"),
+    ("Wheel", "Wheel", "For vehicle wheel colliders"),
+]
+
+# --- Helper functions to create colliders (as previously defined functions) ---
+
 def get_bounding_box(obj):
     """Return world-space min and max corners, size and center of the object's bounding box."""
     world_matrix = obj.matrix_world
     bbox_corners = [world_matrix @ Vector(corner) for corner in obj.bound_box]
-    min_corner = Vector((
-        min(v.x for v in bbox_corners),
-        min(v.y for v in bbox_corners),
-        min(v.z for v in bbox_corners)
-    ))
-    max_corner = Vector((
-        max(v.x for v in bbox_corners),
-        max(v.y for v in bbox_corners),
-        max(v.z for v in bbox_corners)
-    ))
+    min_corner = Vector((min(v.x for v in bbox_corners),
+                         min(v.y for v in bbox_corners),
+                         min(v.z for v in bbox_corners)))
+    max_corner = Vector((max(v.x for v in bbox_corners),
+                         max(v.y for v in bbox_corners),
+                         max(v.z for v in bbox_corners)))
     size = max_corner - min_corner
     center = (min_corner + max_corner) * 0.5
     return min_corner, max_corner, size, center
 
 def get_or_create_collider_material():
-    """Return a material named 'col' (yellow, 10% opacity), creating it if necessary."""
+    """Return a material named 'col' (yellow, 10% opacity)"""
     mat_name = "col"
     mat = bpy.data.materials.get(mat_name)
     if mat is None:
         mat = bpy.data.materials.new(name=mat_name)
-        # Set diffuse color to yellow, with alpha 0.1 (10% opacity)
-        mat.diffuse_color = (1.0, 1.0, 0.0, 0.1)
-        # For Eevee or Cycles, set blend mode to allow transparency.
+        mat.diffuse_color = (1.0, 1.0, 0.0, 0.1)  # Yellow, 10% opacity
         if hasattr(mat, "blend_method"):
             mat.blend_method = 'BLEND'
     return mat
 
 def assign_collider_material(obj):
-    """Assign the 'col' material to the collider object."""
+    """Assign the 'col' material to the object."""
     mat = get_or_create_collider_material()
     if obj.data.materials:
-        obj.data.materials[0] = mat
-    else:
-        obj.data.materials.append(mat)
+        obj.data.materials.clear()
+    obj.data.materials.append(mat)
 
-def link_to_source_collection(new_obj, source_obj):
-    """Link new_obj to every collection that the source_obj is in."""
+def link_to_source_collections(new_obj, source_obj):
+    """Link new_obj to each collection that source_obj is in."""
     for coll in source_obj.users_collection:
         if new_obj.name not in coll.objects:
             coll.objects.link(new_obj)
 
+def parent_to_source(new_obj, source_obj):
+    """Parent new_obj to source_obj and fix transform."""
+    new_obj.parent = source_obj
+    new_obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
+
+# Basic collider creation functions (box, sphere, cylinder, capsule, convex, and triangle)
 def create_box_collider(size, center, src_name):
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=center)
     new_obj = bpy.context.active_object
@@ -53,7 +93,6 @@ def create_box_collider(size, center, src_name):
     bpy.ops.object.mode_set(mode='EDIT')
     bm = bmesh.from_edit_mesh(new_obj.data)
     for v in bm.verts:
-        # The default cube vertices are in [-0.5, 0.5]; scale to match size
         v.co.x *= size.x
         v.co.y *= size.y
         v.co.z *= size.z
@@ -62,7 +101,6 @@ def create_box_collider(size, center, src_name):
     return new_obj
 
 def create_sphere_collider(size, center, src_name):
-    # Use half of the largest dimension as radius.
     r = max(size.x, size.y, size.z) / 2.0
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=center)
     new_obj = bpy.context.active_object
@@ -70,7 +108,6 @@ def create_sphere_collider(size, center, src_name):
     return new_obj
 
 def create_cylinder_collider(size, center, src_name):
-    # Cylinder oriented along Z.
     radius = max(size.x, size.y) / 2.0
     height = size.z
     bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=height, location=center)
@@ -79,24 +116,16 @@ def create_cylinder_collider(size, center, src_name):
     return new_obj
 
 def create_capsule_collider(size, center, src_name):
-    # Capsule along Z.
-    # Use the minimum of X,Y extents for the radius.
     r = min(size.x, size.y) / 2.0
-    # Determine cylinder height: if size.z is larger than 2*r, create a cylindrical mid-part.
     h = size.z - 2 * r
     if h < 0:
-        # If no room for a cylinder, fallback to sphere.
         collider = create_sphere_collider(size, center, src_name)
         collider.name = "UCS_" + src_name
         return collider
-
-    # Create cylinder part.
     cyl_center = center.copy()
     bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=h, location=cyl_center)
     cyl_obj = bpy.context.active_object
     cyl_obj.name = "temp_capsule_cylinder"
-    
-    # Create top hemisphere.
     top_center = center + Vector((0, 0, h/2))
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=top_center)
     sphere_top = bpy.context.active_object
@@ -107,8 +136,6 @@ def create_capsule_collider(size, center, src_name):
     bmesh.ops.delete(bm_top, geom=verts_to_delete, context='VERTS')
     bmesh.update_edit_mesh(sphere_top.data)
     bpy.ops.object.mode_set(mode='OBJECT')
-    
-    # Create bottom hemisphere.
     bottom_center = center - Vector((0, 0, h/2))
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=bottom_center)
     sphere_bottom = bpy.context.active_object
@@ -119,8 +146,6 @@ def create_capsule_collider(size, center, src_name):
     bmesh.ops.delete(bm_bot, geom=verts_to_delete, context='VERTS')
     bmesh.update_edit_mesh(sphere_bottom.data)
     bpy.ops.object.mode_set(mode='OBJECT')
-    
-    # Join the three parts.
     bpy.ops.object.select_all(action='DESELECT')
     cyl_obj.select_set(True)
     sphere_top.select_set(True)
@@ -129,16 +154,12 @@ def create_capsule_collider(size, center, src_name):
     bpy.ops.object.join()
     new_obj = bpy.context.active_object
     new_obj.name = "UCS_" + src_name
-
-    # Optional: Merge doubles along the joins.
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.remove_doubles(threshold=0.0001)
     bpy.ops.object.mode_set(mode='OBJECT')
-    
     return new_obj
 
 def create_convex_collider(src_obj, src_name):
-    # Duplicate the object and compute its convex hull.
     new_obj = src_obj.copy()
     new_obj.data = src_obj.data.copy()
     new_obj.name = "UCX_" + src_name
@@ -152,7 +173,6 @@ def create_convex_collider(src_obj, src_name):
     return new_obj
 
 def create_triangle_collider(src_obj, src_name):
-    # Duplicate the object and convert its faces to triangles.
     new_obj = src_obj.copy()
     new_obj.data = src_obj.data.copy()
     new_obj.name = "UTM_" + src_name
@@ -164,23 +184,38 @@ def create_triangle_collider(src_obj, src_name):
     bpy.ops.object.mode_set(mode='OBJECT')
     return new_obj
 
+# --- Operator that shows a popup dialog to choose collider type and collider usage ---
 class OBJECT_OT_create_collider(bpy.types.Operator):
-    """Create a collider mesh around the selected object(s)."""
+    """Create collider mesh with custom type and usage"""
     bl_idname = "object.create_collider"
     bl_label = "Create Collider"
     bl_options = {'REGISTER', 'UNDO'}
 
+    # Enum property for collider type – available values matching your prefix conventions.
     collider_type: bpy.props.EnumProperty(
         name="Collider Type",
         items=[
-            ('UBX', "Box (UBX)", "Box collider based on bounding box"),
-            ('UCS', "Capsule (UCS)", "Capsule collider based on bounding box"),
-            ('USP', "Sphere (USP)", "Sphere collider based on bounding box"),
-            ('UCL', "Cylinder (UCL)", "Cylinder collider based on bounding box"),
-            ('UCX', "Convex (UCX)", "Convex collider using convex hull of the mesh"),
-            ('UTM', "Triangle (UTM)", "Collider made of triangles (triangulated mesh)"),
-        ]
+            ('UBX', "Box (UBX)", "Box collider"),
+            ('USP', "Sphere (USP)", "Sphere collider"),
+            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+            ('UCS', "Capsule (UCS)", "Capsule collider"),
+            ('UCX', "Convex (UCX)", "Convex collider"),
+            ('UTM', "Triangle (UTM)", "Triangle collider"),
+        ],
+        default='UBX'
     )
+
+    # Enum property for collider usage.
+    collider_usage: bpy.props.EnumProperty(
+        name="Collider Usage",
+        description="Select collider usage (as defined in Arma Reforger collision layer presets)",
+        items=lambda self, context: [(item[0], item[1], item[2]) for item in ALLOWED_COLLIDER_USAGES],
+        default="Main"
+    )
+
+    def invoke(self, context, event):
+        # Pop up a dialog so the user can set the properties.
+        return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
         selected_objects = context.selected_objects
@@ -191,35 +226,36 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
         for obj in selected_objects:
             if obj.type != 'MESH':
                 continue
-
             src_name = obj.name
             collider_obj = None
-            
-            if self.collider_type in {'UBX', 'USP', 'UCL', 'UCS'}:
-                # Use bounding box data for these collider types.
-                _, _, size, center = get_bounding_box(obj)
-
-                if self.collider_type == 'UBX':
-                    collider_obj = create_box_collider(size, center, src_name)
-                elif self.collider_type == 'USP':
-                    collider_obj = create_sphere_collider(size, center, src_name)
-                elif self.collider_type == 'UCL':
-                    collider_obj = create_cylinder_collider(size, center, src_name)
-                elif self.collider_type == 'UCS':
-                    collider_obj = create_capsule_collider(size, center, src_name)
+            # Create collider based on collider type
+            _, _, size, center = get_bounding_box(obj)
+            if self.collider_type == 'UBX':
+                collider_obj = create_box_collider(size, center, src_name)
+            elif self.collider_type == 'USP':
+                collider_obj = create_sphere_collider(size, center, src_name)
+            elif self.collider_type == 'UCL':
+                collider_obj = create_cylinder_collider(size, center, src_name)
+            elif self.collider_type == 'UCS':
+                collider_obj = create_capsule_collider(size, center, src_name)
             elif self.collider_type == 'UCX':
                 collider_obj = create_convex_collider(obj, src_name)
             elif self.collider_type == 'UTM':
                 collider_obj = create_triangle_collider(obj, src_name)
 
-            # Link the collider to the same collections as the source object.
             if collider_obj:
-                link_to_source_collection(collider_obj, obj)
-                # Also assign the collider material.
+                # Link collider to same collections as the source.
+                link_to_source_collections(collider_obj, obj)
+                # Parent collider to the source object.
+                parent_to_source(collider_obj, obj)
+                # Assign the collider material.
                 assign_collider_material(collider_obj)
-
+                # Store the collider usage as a custom property on the collider.
+                collider_obj["usage"] = self.collider_usage
+                self.report({'INFO'}, f"Created collider '{collider_obj.name}' with usage '{self.collider_usage}'")
         return {'FINISHED'}
 
+# --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
     bl_label = "Collider Tools"
     bl_idname = "VIEW3D_PT_collider_panel"
@@ -229,10 +265,12 @@ class VIEW3D_PT_collider_panel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Create Collider for Selected Objects:")
-        layout.operator("object.create_collider")
+        layout.operator("object.create_collider", text="Create Collider")
 
-classes = (OBJECT_OT_create_collider, VIEW3D_PT_collider_panel)
+classes = (
+    OBJECT_OT_create_collider,
+    VIEW3D_PT_collider_panel,
+)
 
 def register():
     for cls in classes:
@@ -241,6 +279,3 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-
-if __name__ == "__main__":
-    register()

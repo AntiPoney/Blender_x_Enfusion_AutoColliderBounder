@@ -6,8 +6,8 @@ bl_info = {
     "location": "View3D > Sidebar > Colliders Tools",
     "description": "Automatically add a collider to the selected object and set it to the correct size.",
     "category": "Import-Export",
-    "doc_url": "https://github.com/AntiPoney/Blender_x_Enfusion_PerCollectionExport",
-    "tracker_url": "https://github.com/AntiPoney/Blender_x_Enfusion_PerCollectionExport/issues",
+    "doc_url": "https://github.com/AntiPoney/Blender_x_Enfusion_AutoColliderBounder",
+    "tracker_url": "https://github.com/AntiPoney/Blender_x_Enfusion_AutoColliderBounder/issues",
 }
 
 import bpy
@@ -21,3 +21,6 @@ def register():
 def unregister():
     from . import AutoColliderBounder
     AutoColliderBounder.unregister()
+
+if __name__ == "__main__":
+    register()
