@@ -1,8 +1,6 @@
 import bpy, bmesh, math
 from mathutils import Vector
 
-from datas.CollidersLayers import ALLOWED_COLLIDER_USAGES
-from datas.CollidersTypes import ALLOWED_COLLIDER_TYPES
 
 def get_bounding_box(obj):
     """Return world-space min and max corners, size and center of the object's bounding box."""
@@ -161,25 +159,65 @@ def create_triangle_collider(src_obj, src_name):
 
 # --- Operator that shows a popup dialog to choose collider type and collider usage ---
 class OBJECT_OT_create_collider(bpy.types.Operator):
+
+
     """Create collider mesh with custom type and usage"""
     bl_idname = "object.create_collider"
     bl_label = "Create Collider"
     bl_options = {'REGISTER', 'UNDO'}
 
     # Use assignment instead of type annotation
-    collider_type = bpy.props.EnumProperty(
+    collider_type: bpy.props.EnumProperty(
         name="Collider Type",
-        items= ALLOWED_COLLIDER_TYPES,
-        default='UBX'
+        items=[
+            ('UBX', "Box (UBX)", "Box collider"),
+            ('USP', "Sphere (USP)", "Sphere collider"),
+            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+            ('UCS', "Capsule (UCS)", "Capsule collider"),
+            ('UCX', "Convex (UCX)", "Convex collider"),
+            ('UTM', "Triangle (UTM)", "Triangle collider"),
+        ],
+        default='UBX',
+    )
+    
+    collider_usage: bpy.props.EnumProperty(
+        name="Collider Usage",
+        items=[
+            ("Main", "Main", "Default usage for colliders"),
+            ("Building", "Building", "For static building collisions"),
+            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
+            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
+            ("Bush", "Bush", "For foliage collisions"),
+            ("Cover", "Cover", "For cover collisions"),
+            ("Character", "Character", "For character colliders"),
+            ("CharacterAI", "CharacterAI", "For AI character colliders"),
+            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
+            ("Debris", "Debris", "For debris colliders"),
+            ("Door", "Door", "For door collisions"),
+            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
+            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
+            ("Foliage", "Foliage", "For vegetation collisions"),
+            ("Interaction", "Interaction", "For interactive colliders"),
+            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
+            ("Ladder", "Ladder", "For ladder interactions"),
+            ("Projectile", "Projectile", "For larger projectiles"),
+            ("Prop", "Prop", "For dynamic prop collisions"),
+            ("PropView", "PropView", "For dynamic props with view collision"),
+            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
+            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
+            ("Terrain", "Terrain", "For terrain collisions"),
+            ("Tree", "Tree", "For tree collider collisions"),
+            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
+            ("TreePart", "TreePart", "For tree branch colliders"),
+            ("Vehicle", "Vehicle", "For vehicle colliders"),
+            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
+            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
+            ("Weapon", "Weapon", "For weapon colliders"),
+            ("Wheel", "Wheel", "For vehicle wheel colliders"),
+        ],
+        default='Main',
     )
 
-    # Enum property for collider usage.
-    collider_usage = bpy.props.EnumProperty(
-        name="usage",
-        description="Select collider usage (as defined in Arma Reforger collision layer presets)",
-        items=lambda self, context: [(item[0], item[1], item[2]) for item in ALLOWED_COLLIDER_USAGES],
-        default="Main"
-    )
 
     def invoke(self, context, event):
         # Pop up a dialog to let the user set the properties.
@@ -222,11 +260,11 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
 
 # --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
-    bl_label = "Enfusion Tools"
+    bl_label = "Colliders Tools"
     bl_idname = "VIEW3D_PT_collider_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Collider Tools"
+    bl_category = "Enfusion Tools"
 
     def draw(self, context):
         layout = self.layout
