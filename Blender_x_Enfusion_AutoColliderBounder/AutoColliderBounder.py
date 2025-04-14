@@ -317,15 +317,69 @@ class OBJECT_OT_modify_collider_layer(bpy.types.Operator):
         for obj in selected_objects:
             if obj.type != 'MESH':
                 continue
+            
             if "usage" in obj:
-                obj["usage"] = self.collider_usage
                 self.report({'INFO'}, f"Modified collider '{obj.name}' to usage '{self.collider_usage}'")
             else:
-                self.report({'WARNING'}, f"Object '{obj.name}' is not a collider")
+                '''create a new custom property "usage" for the collider usage'''
+                self.report({'WARNING'}, f"Object '{obj.name}' was not a collider or usage was not set")
+                
+            obj["usage"] = self.collider_usage
+        
 
         return {'FINISHED'}
     
+
+class OBJECT_OT_modify_collider_Type(bpy.types.Operator):
     
+    """Modify the collider type of the selected colliders"""
+    bl_idname = "object.modify_collider_type"
+    bl_label = "Modify Collider Type"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    collider_type: bpy.props.EnumProperty(
+        name="Collider Type",
+        items=[
+            ('UBX', "Box (UBX)", "Box collider"),
+            ('USP', "Sphere (USP)", "Sphere collider"),
+            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+            ('UCS', "Capsule (UCS)", "Capsule collider"),
+            ('UCX', "Convex (UCX)", "Convex collider (no cave-in geometry)"),
+            ('UTM', "Triangle (UTM)", "Triangle collider (complex geometry)"),
+        ],
+        default='UBX',
+    )
+    
+    def invoke(self, context, event):
+        # Pop up a dialog to let the user set the properties.
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def execute(self, context):
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+
+        for obj in selected_objects:
+            if obj.type != 'MESH':
+                continue
+            
+            '''Get the original collider name and type from the object name'''
+            original_collider_type = obj.name[0:3] 
+            if len(original_collider_type) != 3:
+                self.report({'WARNING'}, f"Object '{obj.name}' is not a valid collider name")
+                continue
+
+            original_name = obj.name[4:]
+
+            '''if the collider is one of all the colliders possible then we can modify it otherwise we return an error'''
+            if original_collider_type not in ['UBX', 'USP', 'UCL', 'UCS', 'UCX', 'UTM']:
+                self.report({'WARNING'}, f"Object '{obj.name}' is not defined as a valid collider")
+                continue
+            
+            '''if we are still here then we just need to modify the name of the object and change the collider type'''
+            obj.name = self.collider_type + "_" + original_name
+        return {'FINISHED'}
 
 # --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
@@ -338,13 +392,14 @@ class VIEW3D_PT_collider_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("object.create_collider", text="Create Collider")
+        layout.operator("object.modify_collider_type", text="Modify Collider Type")
         layout.operator("object.modify_collider_layer", text="Modify Collider Layer")
-        
         
 
 classes = (
     OBJECT_OT_create_collider,
     OBJECT_OT_modify_collider_layer,
+    OBJECT_OT_modify_collider_Type,
     VIEW3D_PT_collider_panel,
 )
 
