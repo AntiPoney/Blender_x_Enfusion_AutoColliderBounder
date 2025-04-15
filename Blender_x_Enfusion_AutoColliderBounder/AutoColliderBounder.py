@@ -2,6 +2,50 @@ import bpy, bmesh, math
 from mathutils import Vector
 
 
+ALLOWED_COLLIDER_TYPES = [
+    ("UBX", "Box (UBX)", "Box collider"),
+    ("USP", "Sphere (USP)", "Sphere collider"),
+    ("UCL", "Cylinder (UCL)", "Cylinder collider"),
+    ("UCS", "Capsule (UCS)", "Capsule collider"),
+    ("UCX", "Convex (UCX)", "Convex collider (no cave-in geometry)"),
+    ("UTM", "Triangle (UTM)", "Triangle collider (complex geometry)"),
+]
+
+ALLOWED_COLLIDER_USAGES = [
+    ("Main", "Main", "Default usage for colliders"),
+    ("Building", "Building", "For static building collisions"),
+    ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
+    ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
+    ("Bush", "Bush", "For foliage collisions"),
+    ("Cover", "Cover", "For cover collisions"),
+    ("Character", "Character", "For character colliders"),
+    ("CharacterAI", "CharacterAI", "For AI character colliders"),
+    ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
+    ("Debris", "Debris", "For debris colliders"),
+    ("Door", "Door", "For door collisions"),
+    ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
+    ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
+    ("Foliage", "Foliage", "For vegetation collisions"),
+    ("Interaction", "Interaction", "For interactive colliders"),
+    ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
+    ("Ladder", "Ladder", "For ladder interactions"),
+    ("Projectile", "Projectile", "For larger projectiles"),
+    ("Prop", "Prop", "For dynamic prop collisions"),
+    ("PropView", "PropView", "For dynamic props with view collision"),
+    ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
+    ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
+    ("Terrain", "Terrain", "For terrain collisions"),
+    ("Tree", "Tree", "For tree collider collisions"),
+    ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
+    ("TreePart", "TreePart", "For tree branch colliders"),
+    ("Vehicle", "Vehicle", "For vehicle colliders"),
+    ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
+    ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
+    ("Weapon", "Weapon", "For weapon colliders"),
+    ("Wheel", "Wheel", "For vehicle wheel colliders"),
+]
+
+
 def get_bounding_box(obj):
     """Return world-space min and max corners, size and center of the object's bounding box."""
     world_matrix = obj.matrix_world
@@ -174,8 +218,6 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
             ('USP', "Sphere (USP)", "Sphere collider"),
             ('UCL', "Cylinder (UCL)", "Cylinder collider"),
             ('UCS', "Capsule (UCS)", "Capsule collider"),
-            ('UCX', "Convex (UCX)", "Convex collider"),
-            ('UTM', "Triangle (UTM)", "Triangle collider"),
         ],
         default='UBX',
     )
@@ -257,7 +299,102 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
                 self.report({'INFO'},
                     f"Created collider '{collider_obj.name}' with usage '{self.collider_usage}'")
         return {'FINISHED'}
+
+class OBJECT_OT_convert_to_collider(bpy.types.Operator):
+
+
+    """Convert the current object to a collider"""
+    bl_idname = "object.convert_to_collider"
+    bl_label = "Convert to Collider"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # Use assignment instead of type annotation
+    collider_type: bpy.props.EnumProperty(
+        name="Collider Type",
+        items=[
+            ('UBX', "Box (UBX)", "Box collider"),
+            ('USP', "Sphere (USP)", "Sphere collider"),
+            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+            ('UCS', "Capsule (UCS)", "Capsule collider"),
+            ('UCX', "Convex (UCX)", "Convex collider"),
+            ('UTM', "Triangle (UTM)", "Triangle collider"),
+        ],
+        default='UCX',
+    )
     
+    collider_usage: bpy.props.EnumProperty(
+        name="Collider Usage",
+        items=[
+            ("Main", "Main", "Default usage for colliders"),
+            ("Building", "Building", "For static building collisions"),
+            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
+            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
+            ("Bush", "Bush", "For foliage collisions"),
+            ("Cover", "Cover", "For cover collisions"),
+            ("Character", "Character", "For character colliders"),
+            ("CharacterAI", "CharacterAI", "For AI character colliders"),
+            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
+            ("Debris", "Debris", "For debris colliders"),
+            ("Door", "Door", "For door collisions"),
+            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
+            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
+            ("Foliage", "Foliage", "For vegetation collisions"),
+            ("Interaction", "Interaction", "For interactive colliders"),
+            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
+            ("Ladder", "Ladder", "For ladder interactions"),
+            ("Projectile", "Projectile", "For larger projectiles"),
+            ("Prop", "Prop", "For dynamic prop collisions"),
+            ("PropView", "PropView", "For dynamic props with view collision"),
+            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
+            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
+            ("Terrain", "Terrain", "For terrain collisions"),
+            ("Tree", "Tree", "For tree collider collisions"),
+            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
+            ("TreePart", "TreePart", "For tree branch colliders"),
+            ("Vehicle", "Vehicle", "For vehicle colliders"),
+            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
+            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
+            ("Weapon", "Weapon", "For weapon colliders"),
+            ("Wheel", "Wheel", "For vehicle wheel colliders"),
+        ],
+        default='Main',
+    )
+
+
+    def invoke(self, context, event):
+        # Pop up a dialog to let the user set the properties.
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+
+        for obj in selected_objects:
+            if obj.type != 'MESH':
+                continue
+            
+            ''' if the collider type to convert is UTM, then we need to triangulate the mesh first '''
+            if self.collider_type == 'UTM':
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.quads_convert_to_tris()
+                bpy.ops.object.mode_set(mode='OBJECT')
+                
+                
+            ''' modify the name of the object to the new collider type + the original name ''' 
+            oldObjName = obj.name
+            obj.name = self.collider_type + "_" + oldObjName
+            
+            ''' set the usage of the collider to the new usage '''
+            obj["usage"] = self.collider_usage
+            
+            ''' finally we need to assign the collider material to the object '''
+            assign_collider_material(obj)
+            
+        return {'FINISHED'}
+
     
 class OBJECT_OT_modify_collider_layer(bpy.types.Operator):
     
@@ -392,12 +529,14 @@ class VIEW3D_PT_collider_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("object.create_collider", text="Create Collider")
+        layout.operator("object.convert_to_collider", text="Convert to Collider")
         layout.operator("object.modify_collider_type", text="Modify Collider Type")
         layout.operator("object.modify_collider_layer", text="Modify Collider Layer")
-        
+    
 
 classes = (
     OBJECT_OT_create_collider,
+    OBJECT_OT_convert_to_collider,
     OBJECT_OT_modify_collider_layer,
     OBJECT_OT_modify_collider_Type,
     VIEW3D_PT_collider_panel,
