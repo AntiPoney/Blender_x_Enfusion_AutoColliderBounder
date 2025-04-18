@@ -1,50 +1,16 @@
-import bpy, bmesh, math
+import bpy, bmesh, math, importlib, sys, re
 from mathutils import Vector
 
+EnfusionCoreUtils = None
 
-ALLOWED_COLLIDER_TYPES = [
-    ("UBX", "Box (UBX)", "Box collider"),
-    ("USP", "Sphere (USP)", "Sphere collider"),
-    ("UCL", "Cylinder (UCL)", "Cylinder collider"),
-    ("UCS", "Capsule (UCS)", "Capsule collider"),
-    ("UCX", "Convex (UCX)", "Convex collider (no cave-in geometry)"),
-    ("UTM", "Triangle (UTM)", "Triangle collider (complex geometry)"),
-]
+if "EnfusionBlenderTools" in sys.modules:
+    EnfusionToolsKit = sys.modules["EnfusionBlenderTools"]
+    EnfusionCoreUtils = importlib.import_module("EnfusionBlenderTools.core.utils")
+    EnfusionCoreColCache = importlib.import_module("EnfusionBlenderTools.core.collider_cache")
+    EnfusionColliderSetupCache = EnfusionCoreColCache.ColliderSetupCache
 
-ALLOWED_COLLIDER_USAGES = [
-    ("Main", "Main", "Default usage for colliders"),
-    ("Building", "Building", "For static building collisions"),
-    ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
-    ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
-    ("Bush", "Bush", "For foliage collisions"),
-    ("Cover", "Cover", "For cover collisions"),
-    ("Character", "Character", "For character colliders"),
-    ("CharacterAI", "CharacterAI", "For AI character colliders"),
-    ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
-    ("Debris", "Debris", "For debris colliders"),
-    ("Door", "Door", "For door collisions"),
-    ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
-    ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
-    ("Foliage", "Foliage", "For vegetation collisions"),
-    ("Interaction", "Interaction", "For interactive colliders"),
-    ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
-    ("Ladder", "Ladder", "For ladder interactions"),
-    ("Projectile", "Projectile", "For larger projectiles"),
-    ("Prop", "Prop", "For dynamic prop collisions"),
-    ("PropView", "PropView", "For dynamic props with view collision"),
-    ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
-    ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
-    ("Terrain", "Terrain", "For terrain collisions"),
-    ("Tree", "Tree", "For tree collider collisions"),
-    ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
-    ("TreePart", "TreePart", "For tree branch colliders"),
-    ("Vehicle", "Vehicle", "For vehicle colliders"),
-    ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
-    ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
-    ("Weapon", "Weapon", "For weapon colliders"),
-    ("Wheel", "Wheel", "For vehicle wheel colliders"),
-]
 
+LOD_STRING_PATTERN = re.compile(r'.*_LOD\d$', re.IGNORECASE)
 
 def get_bounding_box(obj):
     """Return world-space min and max corners, size and center of the object's bounding box."""
@@ -176,20 +142,6 @@ def create_capsule_collider(size, center, src_name):
     bpy.ops.object.mode_set(mode='OBJECT')
     return new_obj
 
-def create_convex_collider(src_obj, src_name):
-    new_obj = src_obj.copy()
-    new_obj.data = src_obj.data.copy()
-    new_obj.name = "UCX_" + src_name
-    bpy.context.collection.objects.link(new_obj)
-    bpy.context.view_layer.objects.active = new_obj
-    bpy.ops.object.mode_set(mode='EDIT')
-    bm = bmesh.from_edit_mesh(new_obj.data)
-    bmesh.ops.convex_hull(bm, input=bm.verts)
-    bmesh.update_edit_mesh(new_obj.data)
-    bpy.ops.object.mode_set(mode='OBJECT')
-    return new_obj
-
-def create_triangle_collider(src_obj, src_name):
     new_obj = src_obj.copy()
     new_obj.data = src_obj.data.copy()
     new_obj.name = "UTM_" + src_name
@@ -210,62 +162,64 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
     bl_label = "Create Collider"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # Use assignment instead of type annotation
-    collider_type: bpy.props.EnumProperty(
-        name="Collider Type",
-        items=[
-            ('UBX', "Box (UBX)", "Box collider"),
-            ('USP', "Sphere (USP)", "Sphere collider"),
-            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
-            ('UCS', "Capsule (UCS)", "Capsule collider"),
-        ],
-        default='UBX',
-    )
+    # if the enfusion 
+    if EnfusionCoreUtils is not None:
+        
+        collider_type : EnumProperty(
+            name = "Collider Type",
+            items=[
+                ('UBX', "Box (UBX)", "Box collider"),
+                ('USP', "Sphere (USP)", "Sphere collider"),
+                ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+                ('UCS', "Capsule (UCS)", "Capsule collider"),
+            ],
+            default='UBX',
+        )
+        
+        game_material_item : EnumProperty(
+            name = "Game materials",
+            items = EnfusionCoreColCache.get_game_mats_enum_callback
+        ) #type: ignore
+
+        layer_preset_item : EnumProperty(
+            name = "Layer Presets",
+            items = EnfusionCoreColCache.get_layer_presets_enum_callback
+        ) 
+        
+        
+    # if layer_presets is None, then we need to abort the operation
+    if (game_material_item is None) or (layer_preset_item is None):
+        raise RuntimeError("something went wrong while calling Enfusion Tools. Please report the issue.")
     
-    collider_usage: bpy.props.EnumProperty(
-        name="Collider Usage",
-        items=[
-            ("Main", "Main", "Default usage for colliders"),
-            ("Building", "Building", "For static building collisions"),
-            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
-            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
-            ("Bush", "Bush", "For foliage collisions"),
-            ("Cover", "Cover", "For cover collisions"),
-            ("Character", "Character", "For character colliders"),
-            ("CharacterAI", "CharacterAI", "For AI character colliders"),
-            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
-            ("Debris", "Debris", "For debris colliders"),
-            ("Door", "Door", "For door collisions"),
-            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
-            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
-            ("Foliage", "Foliage", "For vegetation collisions"),
-            ("Interaction", "Interaction", "For interactive colliders"),
-            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
-            ("Ladder", "Ladder", "For ladder interactions"),
-            ("Projectile", "Projectile", "For larger projectiles"),
-            ("Prop", "Prop", "For dynamic prop collisions"),
-            ("PropView", "PropView", "For dynamic props with view collision"),
-            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
-            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
-            ("Terrain", "Terrain", "For terrain collisions"),
-            ("Tree", "Tree", "For tree collider collisions"),
-            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
-            ("TreePart", "TreePart", "For tree branch colliders"),
-            ("Vehicle", "Vehicle", "For vehicle colliders"),
-            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
-            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
-            ("Weapon", "Weapon", "For weapon colliders"),
-            ("Wheel", "Wheel", "For vehicle wheel colliders"),
-        ],
-        default='Main',
-    )
-
-
     def invoke(self, context, event):
-        # Pop up a dialog to let the user set the properties.
+        
+        self.set_game_material_invoke(context)
+        self.set_layer_preset_invoke(context)
+
         return context.window_manager.invoke_props_dialog(self)
+    
+    def set_layer_preset_invoke(self, context):
+        active = context.active_object
+        key = "None"
+
+        if "usage" in active.keys():
+            usage_attrib = active["usage"]
+            key = usage_attrib
+
+        self.layer_preset_item = key
+    
+    def set_game_material_invoke(self, context):
+        active = context.active_object
+        active_material = active.active_material
+        
+        material_name = active_material.name if active_material else "No change"
+        
+        material_name_to_enum_key = EnfusionColliderSetupCache.material_name_to_enum_key()
+        key = material_name_to_enum_key.get(material_name, "No change")
+        self.game_material_item = key
 
     def execute(self, context):
+        
         selected_objects = context.selected_objects
         if not selected_objects:
             self.report({'WARNING'}, "No objects selected")
@@ -275,8 +229,15 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
             if obj.type != 'MESH':
                 continue
             src_name = obj.name
+            
+            # if source name end with some sufixes, then we need to remove them (_LODx)
+            if LOD_STRING_PATTERN.match(src_name):
+                src_name = src_name[:-5]  # Remove the last 5 characters (_LODx)
+                
+            
             collider_obj = None
             _, _, size, center = get_bounding_box(obj)
+            
             if self.collider_type == 'UBX':
                 collider_obj = create_box_collider(size, center, src_name)
             elif self.collider_type == 'USP':
@@ -285,20 +246,38 @@ class OBJECT_OT_create_collider(bpy.types.Operator):
                 collider_obj = create_cylinder_collider(size, center, src_name)
             elif self.collider_type == 'UCS':
                 collider_obj = create_capsule_collider(size, center, src_name)
-            elif self.collider_type == 'UCX':
-                collider_obj = create_convex_collider(obj, src_name)
-            elif self.collider_type == 'UTM':
-                collider_obj = create_triangle_collider(obj, src_name)
 
             if collider_obj:
                 link_to_source_collections(collider_obj, obj)
                 parent_to_source(collider_obj, obj)
-                assign_collider_material(collider_obj)
-                # Now self.collider_usage is available since it’s properly registered.
-                collider_obj["usage"] = self.collider_usage
+                
+                self.set_game_materials_exec(collider_obj)
+                self.set_layer_presets_exec(collider_obj)
+                
                 self.report({'INFO'},
-                    f"Created collider '{collider_obj.name}' with usage '{self.collider_usage}'")
+                    f"Created collider '{collider_obj.name}' with usage '{self.layer_preset_item}'")
+                
         return {'FINISHED'}
+    
+    def set_game_materials_exec(self, obj):
+        key = self.game_material_item
+
+        if key == 'No change':
+            return 
+
+        chosen_material_name = EnfusionColliderSetupCache._gamemat_enum_key_to_material_name[key]
+        material = bpy.data.materials.get(chosen_material_name)
+
+        if material is None:
+            material = get_random_colored_material(chosen_material_name)
+
+        
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+
+    def set_layer_presets_exec(self, obj):
+        obj["usage"] = self.layer_preset_item
+
 
 class OBJECT_OT_convert_to_collider(bpy.types.Operator):
 
@@ -385,6 +364,11 @@ class OBJECT_OT_convert_to_collider(bpy.types.Operator):
                 
             ''' modify the name of the object to the new collider type + the original name ''' 
             oldObjName = obj.name
+            
+            # if source name end with _LOD sufixes, then we need to remove them (_LODx, )
+            if LOD_STRING_PATTERN.match(oldObjName):
+                oldObjName = oldObjName[:-5]  # Remove the last 5 characters (_LODx)
+            
             obj.name = self.collider_type + "_" + oldObjName
             
             ''' set the usage of the collider to the new usage '''
@@ -395,128 +379,6 @@ class OBJECT_OT_convert_to_collider(bpy.types.Operator):
             
         return {'FINISHED'}
 
-    
-class OBJECT_OT_modify_collider_layer(bpy.types.Operator):
-    
-    """Modify the layer of the selected colliders"""
-    bl_idname = "object.modify_collider_layer"
-    bl_label = "Modify Collider Layer"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    collider_usage: bpy.props.EnumProperty(
-        name="Collider Usage",
-        items=[
-            ("Main", "Main", "Default usage for colliders"),
-            ("Building", "Building", "For static building collisions"),
-            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
-            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
-            ("Bush", "Bush", "For foliage collisions"),
-            ("Cover", "Cover", "For cover collisions"),
-            ("Character", "Character", "For character colliders"),
-            ("CharacterAI", "CharacterAI", "For AI character colliders"),
-            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
-            ("Debris", "Debris", "For debris colliders"),
-            ("Door", "Door", "For door collisions"),
-            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
-            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
-            ("Foliage", "Foliage", "For vegetation collisions"),
-            ("Interaction", "Interaction", "For interactive colliders"),
-            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
-            ("Ladder", "Ladder", "For ladder interactions"),
-            ("Projectile", "Projectile", "For larger projectiles"),
-            ("Prop", "Prop", "For dynamic prop collisions"),
-            ("PropView", "PropView", "For dynamic props with view collision"),
-            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
-            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
-            ("Terrain", "Terrain", "For terrain collisions"),
-            ("Tree", "Tree", "For tree collider collisions"),
-            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
-            ("TreePart", "TreePart", "For tree branch colliders"),
-            ("Vehicle", "Vehicle", "For vehicle colliders"),
-            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
-            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
-            ("Weapon", "Weapon", "For weapon colliders"),
-            ("Wheel", "Wheel", "For vehicle wheel colliders"),
-        ],
-        default='Main',
-    )
-    
-    def invoke(self, context, event):
-        # Pop up a dialog to let the user set the properties.
-        return context.window_manager.invoke_props_dialog(self)
-    
-    def execute(self, context):
-        selected_objects = context.selected_objects
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-
-        for obj in selected_objects:
-            if obj.type != 'MESH':
-                continue
-            
-            if "usage" in obj:
-                self.report({'INFO'}, f"Modified collider '{obj.name}' to usage '{self.collider_usage}'")
-            else:
-                '''create a new custom property "usage" for the collider usage'''
-                self.report({'WARNING'}, f"Object '{obj.name}' was not a collider or usage was not set")
-                
-            obj["usage"] = self.collider_usage
-        
-
-        return {'FINISHED'}
-    
-
-class OBJECT_OT_modify_collider_Type(bpy.types.Operator):
-    
-    """Modify the collider type of the selected colliders"""
-    bl_idname = "object.modify_collider_type"
-    bl_label = "Modify Collider Type"
-    bl_options = {'REGISTER', 'UNDO'}
-    
-    collider_type: bpy.props.EnumProperty(
-        name="Collider Type",
-        items=[
-            ('UBX', "Box (UBX)", "Box collider"),
-            ('USP', "Sphere (USP)", "Sphere collider"),
-            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
-            ('UCS', "Capsule (UCS)", "Capsule collider"),
-            ('UCX', "Convex (UCX)", "Convex collider (no cave-in geometry)"),
-            ('UTM', "Triangle (UTM)", "Triangle collider (complex geometry)"),
-        ],
-        default='UBX',
-    )
-    
-    def invoke(self, context, event):
-        # Pop up a dialog to let the user set the properties.
-        return context.window_manager.invoke_props_dialog(self)
-    
-    def execute(self, context):
-        selected_objects = context.selected_objects
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-
-        for obj in selected_objects:
-            if obj.type != 'MESH':
-                continue
-            
-            '''Get the original collider name and type from the object name'''
-            original_collider_type = obj.name[0:3] 
-            if len(original_collider_type) != 3:
-                self.report({'WARNING'}, f"Object '{obj.name}' is not a valid collider name")
-                continue
-
-            original_name = obj.name[4:]
-
-            '''if the collider is one of all the colliders possible then we can modify it otherwise we return an error'''
-            if original_collider_type not in ['UBX', 'USP', 'UCL', 'UCS', 'UCX', 'UTM']:
-                self.report({'WARNING'}, f"Object '{obj.name}' is not defined as a valid collider")
-                continue
-            
-            '''if we are still here then we just need to modify the name of the object and change the collider type'''
-            obj.name = self.collider_type + "_" + original_name
-        return {'FINISHED'}
 
 # --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
@@ -530,15 +392,14 @@ class VIEW3D_PT_collider_panel(bpy.types.Panel):
         layout = self.layout
         layout.operator("object.create_collider", text="Create Collider")
         layout.operator("object.convert_to_collider", text="Convert to Collider")
-        layout.operator("object.modify_collider_type", text="Modify Collider Type")
-        layout.operator("object.modify_collider_layer", text="Modify Collider Layer")
+        layout.operator("object.modify_to_type", text="Modify Type")
+        layout.operator("object.modify_to_layer", text="Modify Layer")
+        layout.operator("object.modify_to_material", text="Modify Material")
     
 
 classes = (
     OBJECT_OT_create_collider,
     OBJECT_OT_convert_to_collider,
-    OBJECT_OT_modify_collider_layer,
-    OBJECT_OT_modify_collider_Type,
     VIEW3D_PT_collider_panel,
 )
 
