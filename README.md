@@ -9,6 +9,7 @@ A Blender add-on for creating / converting mesh objects into clicks ready collid
   - Sphere collider
   - Capsule collider
   - Cylinder collider
+  - Convex collider (from complex mesh)
 
 - Convert any object(s) mesh(es) into a click ready collider(s) :
   - Convex collider
