@@ -153,6 +153,8 @@ def create_capsule_collider(size, center, src_name):
     bpy.ops.object.mode_set(mode='OBJECT')
     return new_obj
 
+
+
 # --- Operator that shows a popup dialog to choose collider type and collider usage ---
 class OBJECT_OT_create_collider(bpy.types.Operator):
 
@@ -286,60 +288,20 @@ class OBJECT_OT_convert_to_collider(bpy.types.Operator):
     bl_idname = "object.convert_to_collider"
     bl_label = "Convert to Collider"
     bl_options = {'REGISTER', 'UNDO'}
-
-    # Use assignment instead of type annotation
-    collider_type: bpy.props.EnumProperty(
-        name="Collider Type",
-        items=[
-            ('UBX', "Box (UBX)", "Box collider"),
-            ('USP', "Sphere (USP)", "Sphere collider"),
-            ('UCL', "Cylinder (UCL)", "Cylinder collider"),
-            ('UCS', "Capsule (UCS)", "Capsule collider"),
-            ('UCX', "Convex (UCX)", "Convex collider"),
-            ('UTM', "Triangle (UTM)", "Triangle collider"),
-        ],
-        default='UCX',
-    )
     
-    collider_usage: bpy.props.EnumProperty(
-        name="Collider Usage",
-        items=[
-            ("Main", "Main", "Default usage for colliders"),
-            ("Building", "Building", "For static building collisions"),
-            ("BuildingFire", "BuildingFire", "For fire collisions on buildings"),
-            ("BuildingFireView", "BuildingFireView", "For fire and view collisions on building parts"),
-            ("Bush", "Bush", "For foliage collisions"),
-            ("Cover", "Cover", "For cover collisions"),
-            ("Character", "Character", "For character colliders"),
-            ("CharacterAI", "CharacterAI", "For AI character colliders"),
-            ("CharNoCollide", "CharNoCollide", "For non-colliding character elements"),
-            ("Debris", "Debris", "For debris colliders"),
-            ("Door", "Door", "For door collisions"),
-            ("DoorFireView", "DoorFireView", "For door collisions with fire and view layers"),
-            ("FireGeo", "FireGeo", "For bullet-impact detection on fire geometry"),
-            ("Foliage", "Foliage", "For vegetation collisions"),
-            ("Interaction", "Interaction", "For interactive colliders"),
-            ("ItemFireView", "ItemFireView", "For non-character items that need fire/view collisions"),
-            ("Ladder", "Ladder", "For ladder interactions"),
-            ("Projectile", "Projectile", "For larger projectiles"),
-            ("Prop", "Prop", "For dynamic prop collisions"),
-            ("PropView", "PropView", "For dynamic props with view collision"),
-            ("PropFireView", "PropFireView", "For dynamic prop collisions with fire/view layers"),
-            ("RockFireView", "RockFireView", "For rock collisions with fire/view layers"),
-            ("Terrain", "Terrain", "For terrain collisions"),
-            ("Tree", "Tree", "For tree collider collisions"),
-            ("TreeFireView", "TreeFireView", "For trees with fire/view collision"),
-            ("TreePart", "TreePart", "For tree branch colliders"),
-            ("Vehicle", "Vehicle", "For vehicle colliders"),
-            ("VehicleFire", "VehicleFire", "For vehicles colliding with fire geometry"),
-            ("VehicleFireView", "VehicleFireView", "For vehicle collisions with fire and view layers"),
-            ("Weapon", "Weapon", "For weapon colliders"),
-            ("Wheel", "Wheel", "For vehicle wheel colliders"),
-        ],
-        default='Main',
-    )
-
-
+    collider_type : EnumProperty(
+            name = "Collider Type",
+            items=[
+                ('UBX', "Box (UBX)", "Box collider"),
+                ('USP', "Sphere (USP)", "Sphere collider"),
+                ('UCL', "Cylinder (UCL)", "Cylinder collider"),
+                ('UCS', "Capsule (UCS)", "Capsule collider"),
+                ('UCX', "Convex (UCX)", "Convex collider"),
+                ('UTM', "Triangle (UTM)", "Triangle collider"),
+            ],
+            default='UBX',
+        )
+    
     def invoke(self, context, event):
         # Pop up a dialog to let the user set the properties.
         return context.window_manager.invoke_props_dialog(self)
@@ -379,6 +341,11 @@ class OBJECT_OT_convert_to_collider(bpy.types.Operator):
             
         return {'FINISHED'}
 
+class OBJECT_OT_modify_to_type(bpy.types.Operator):
+    
+    
+class OBJECT_OT_modify_to_layer(bpy.types.Operator):
+class OBJECT_OT_modify_to_material(bpy.types.Operator):
 
 # --- UI Panel to run the operator ---
 class VIEW3D_PT_collider_panel(bpy.types.Panel):
